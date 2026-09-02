@@ -1,0 +1,92 @@
+services:
+  accountsdb:
+    container_name: accountsdb
+    environment:
+      MYSQL_DATABASE: accountsdb
+    ports:
+      - "3306:3306"
+    extends:
+      file: common-config.yml
+      service: microservice-db-config
+  loandb:
+    container_name: loandb
+    environment:
+      MYSQL_DATABASE: loandb
+    ports:
+      - "3307:3306"
+    extends:
+      file: common-config.yml
+      service: microservice-db-config
+  cardsdb:
+    container_name: cardsdb
+    environment:
+      MYSQL_DATABASE: cardsdb
+    ports:
+      - "3308:3306"
+    extends:
+      file: common-config.yml
+      service: microservice-db-config
+
+  configserver:
+    image: "sentinelshadow/configserver:s7"
+    container_name: configserver
+    ports:
+      - "8071:8071"
+    healthcheck:
+      test: "curl --fail --silent http://localhost:8071/actuator/health/readiness | grep UP || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    extends:
+      file: common-config.yml
+      service: microservice-base-config
+
+  accounts:
+    image: "sentinelshadow/accounts:s7"
+    container_name: accounts-ms
+    ports:
+      - "8080:8080"
+    depends_on:
+      accountsdb:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: "accounts"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://accountsdb:3306/accountsdb"
+    extends:
+      file: common-config.yml
+      service: microservice-configserver-config
+
+  loan:
+    image: "sentinelshadow/loan:s7"
+    container_name: loan-ms
+    ports:
+      - "8090:8090"
+    depends_on:
+      loandb:
+        condition: service_healthy
+    extends:
+      file: common-config.yml
+      service: microservice-configserver-config
+    environment:
+      SPRING_APPLICATION_NAME: "loan"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://loandb:3306/loandb"
+
+  cards:
+    image: "sentinelshadow/cards:s7"
+    container_name: cards-ms
+    ports:
+      - "9000:9000"
+    depends_on:
+      cardsdb:
+        condition: service_healthy
+    extends:
+      file: common-config.yml
+      service: microservice-configserver-config
+    environment:
+      SPRING_APPLICATION_NAME: "cards"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://cardsdb:3306/cardsdb"
+
+networks:
+  eazybank:
+    driver: "bridge"
